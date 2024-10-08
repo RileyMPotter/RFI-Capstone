@@ -1,0 +1,141 @@
+clear all 
+%%%%%%%%% 
+tic
+%%%%%%%%%
+K = 4096; % the number of channels
+N = 65024; % the number of time samples 
+Nsub = 512; 
+Nblock = 127; 
+sigma = 4; 
+No = 0;  % varies from 0 to 4 (5 chunks in total)
+%%%%%%%%%%%%
+Th = sigma/0.6745; % Original value of Th is 3.5/0.6745. 
+
+
+load j1713_mat_0;
+
+
+position = No*Nblock; 
+re_chunk = single(re(:,position*Nsub+1:(position+Nblock)*Nsub,1)); 
+im_chunk = single(im(:,position*Nsub+1:(position+Nblock)*Nsub,1)); 
+
+psd_chunk = re_chunk.^2 + im_chunk.^2; 
+
+scale = 0:1:2^16-1; 
+v = 1:2^16; 
+
+count = 1;
+for ind = 1:1:Nblock 
+tf = psd_chunk(:,(ind-1)*Nsub+1:ind*Nsub).'; 
+
+r = 1; 
+for chan = 1:1:K
+    % Histogram of intensity per chanel per segment
+    [num,pos] = hist(tf(:,chan),[scale]); 
+    num = num./sum(num) + 10^(-10);     
+    % Reference data
+    % Mean and STD per channel
+    mu = mean(tf(:,chan)); 
+    sig = var(tf(:,chan)); 
+    % Reference pdf 
+    
+    
+    num_ref = exp(-scale./sqrt(sig)) - exp(-v./sqrt(sig)) + 10^(-10); 
+%    num_ref = 1/sqrt(sig)*exp(-scale./sqrt(sig)) + 10^(-10); 
+%    sum(num_ref)
+      
+%     figure(1) 
+%     plot(pos,num,'b',pos,num_ref,'r')
+%     axis([0,5000,0,0.01])
+%     pause(0.5)
+
+% Relative entropy per channel per segment 
+    KL(ind,chan) = sum(num_ref.*log(num_ref./num)) + sum(num.*log(num./num_ref)); 
+%    chan
+end 
+
+count = count + 1
+end
+
+
+%%%%%%%%%%%%%%% Compute the mask for KL distance %%%%%%%%%%%%%
+% The mask is based on ruling out outlier points using z-score
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+for chan = 1:K 
+   for ind = 1:Nblock  
+        alpha = median(KL(:,chan)); 
+        beta = median(abs( KL(:,chan) - alpha )); 
+        if abs((KL(ind,chan) - alpha)/beta) > Th 
+            mask_KL(ind,chan) = 0; 
+        else 
+            mask_KL(ind,chan) = 1; 
+        end
+    end 
+end
+                         
+
+% Masked KL matrix 
+% masked_KL = KL.*mask_KL; 
+
+
+
+figure(3) 
+waterfall(KL.')
+axis xy
+%axis([0,1024,0,127,0,0.5])
+axis([0,127,0,4096,0,20])
+ylabel('channels, in bins')
+xlabel('blocks grouped by 512 time samples')
+title('Relative Entropy, pol0')
+colorbar
+
+count = 1;
+for ind = 1:1:Nblock 
+    for chan = 1:K 
+    burst((ind-1)*Nsub+1:ind*Nsub,chan) = mask_KL(ind,chan)*psd_chunk(chan,(ind-1)*Nsub+1:ind*Nsub,1).'; 
+    end
+count = count + 1  
+end 
+
+DM = 15.917;
+BW = 800*10^6;	% bandwidth [Hz]
+f_c = 1500097656;	% center frequency [Hz]
+K = 4096;        % number of channels
+Ts = K/BW;	% sample period [sec]
+flo = 1100;
+fhi = 1900; 
+
+%%%%%%%%%%% load PSD %%%%%%%%%%%
+size(burst) 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%% 
+[K,Nsub] = size(burst.'); 
+
+%%%%%%%%%%%%%%%% Dedisperse the Burst %%%%%%%%%%%%%%%%
+%M = Nsub; 
+delta = 1; 
+dedispersed_burst = dedispersion(burst.',DM,BW,f_c,K,Ts); 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+time_high_res = single(0:(Ts*delta):(Ts*Nsub-Ts*delta)); %-Ts*7086));
+%dlmwrite('time_high_res_Nblocks_127.txt', time_high_res, 'delimiter','\t','newline','pc','precision',13);
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Find the SNR of Single pulse
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+intensity = sum(single(dedispersed_burst),1);  
+%dlmwrite('mat_0_chunk_0_Nblock_127_REa_PSD_Th_4.txt', intensity, 'delimiter','\t','newline','pc','precision',13);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+
+figure(4)
+%subplot(1,2,2)
+plot( time_high_res, filter(ones(32,1),1,intensity - mean(intensity) ))
+grid 
+%hold on
+toc
+
+
+
+

@@ -20,15 +20,7 @@ mat_data = scipy.io.loadmat('mat_0_chunk_0_SW_Th_00001.mat')
 burst = mat_data['burst']
 K, Nsub = burst.shape
 
-# Dedispersion function definition
-def dedispersion(burst, DM, BW, f_c, K, Ts):
-    # Placeholder implementation for dedispersion
-    # This should be replaced with a real dedisperion algorithm
-    return burst
-
-# Dedisperse the burst
-delta = 1
-dedispersed_burst = dedispersion(burst, DM, BW, f_c, K, Ts)
+# Dedisperse stuff here
 
 # Plot dedispersed data
 plt.figure(4)
