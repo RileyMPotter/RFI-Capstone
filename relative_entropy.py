@@ -52,7 +52,7 @@ for ind in range(Nblock):
         KL[ind, chan] = np.sum(num_ref * np.log(num_ref / num)) + np.sum(num * np.log(num / num_ref))
 
 # Compute the mask for KL distance
-for chan in range(k):
+for chan in range(K):
     alpha = np.median(KL[:, chan])
     beta = np.median(np.abs(KL[:, chan] - alpha))
 
@@ -91,7 +91,7 @@ plt.xlabel('Time (s)')
 plt.ylabel('Intesity')
 plt.title('SNR of Signle Pulse')
 plt.grid(True)
-pls.show()
+plt.show()
 
 print(f"Execution time: {time.time()} seconds")
 
