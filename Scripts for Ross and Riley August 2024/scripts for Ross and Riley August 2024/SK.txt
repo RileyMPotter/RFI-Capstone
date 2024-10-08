@@ -1,0 +1,162 @@
+clear all 
+tic
+K = 4096; % the number of channels
+N = 325120; % 65024 the number of time samples 
+Nsub = 127; 
+Nblock = 512; % 325120/(512*127) = 5 chunks per mat_*
+%%%%%%%%%%%%
+sigma = 3.5; 
+No = 0;     % varies from 0 to 4 (5 chunks in total)
+%%%%%%%%%%%%
+
+
+load j1713_mat_0;
+
+
+position = No*Nblock; 
+re_sk = re(:,position*Nsub+1:(position+Nblock)*Nsub,1); 
+im_sk = im(:,position*Nsub+1:(position+Nblock)*Nsub,1); 
+
+count = 1;
+for ind = 1:1:Nblock
+tf1 = single(re_sk(:,(ind-1)*Nsub+1:ind*Nsub,1)).';
+tf2 = single(im_sk(:,(ind-1)*Nsub+1:ind*Nsub,1)).';
+
+
+
+r = 1; 
+for i = 1:1:K
+    
+    %Calculate S1 and S2 per channel per block 
+    S_1(i) = sum( (tf1(:,i)).^2 + (tf2(:,i)).^2,1); 
+    S_2(i) = sum(((tf1(:,i)).^2 + (tf2(:,i)).^2).^2,1); 
+    V(i) = (Nsub + 1)/(Nsub - 1)*(Nsub*(S_2(i)/S_1(i)^2) - 1); 
+              
+    r = r + 1;   
+end
+
+
+%Collect data for waterfall plots
+SK(count,:) = V; 
+count = count + 1;
+end 
+
+
+%%%%%%%%%%%%%%% Compute the mask for SK %%%%%%%%%%%%% 
+for chan = 1:K 
+   for ind = 1:Nblock  
+        if abs(SK(ind,chan) - 1) > sigma*2/sqrt(Nsub) 
+            mask_SK_pol0(ind,chan) = 0; 
+        else 
+            mask_SK_pol0(ind,chan) = 1; 
+        end        
+    end 
+end
+
+
+% figure(1)
+% imagesc(mask_SK_pol0') 
+% axis xy 
+% xlabel('time samples, in bins')
+% ylabel('frequency samples, in bins')
+% colorbar     
+% pause
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%% Masked Channalized Voltages using SK %%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+count = 1;
+for ind = 1:1:Nblock 
+    for chan = 1:K 
+        
+tf_pol0_re_mask((ind-1)*Nsub+1:ind*Nsub,chan) = mask_SK_pol0(ind,chan)*re_sk(chan,(ind-1)*Nsub+1:ind*Nsub,1)'; 
+tf_pol0_im_mask((ind-1)*Nsub+1:ind*Nsub,chan) = mask_SK_pol0(ind,chan)*im_sk(chan,(ind-1)*Nsub+1:ind*Nsub,1)';
+
+% tf_pol0_mask((ind-1)*Nsub+1:ind*Nsub,chan) = mask_SK_pol0(ind,chan)*ones(1,length((ind-1)*Nsub+1:ind*Nsub))'; 
+
+    end
+count = count + 1;  
+end 
+
+% SK_mask = tf_pol0_mask'; 
+% 
+% figure(2)
+% imagesc(SK_mask) 
+% axis xy 
+% xlabel('time samples, in bins')
+% ylabel('frequency samples, in bins') 
+% colorbar       
+%  
+% count 
+% pause 
+
+%%%%%%%%%%%%%%%%%%% Masked PSD using SK filter %%%%%%%%%%%%%%%%%%% 
+burst = ((single(tf_pol0_re_mask)).^2 + (single(tf_pol0_im_mask)).^2).'; 
+
+figure(3)
+imagesc(burst)
+colorbar
+axis xy 
+xlabel('time, in bins')
+ylabel('frequency, in bins')
+title('Data Prior Dedispersion')
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+DM = 15.917; 
+BW = 800*10^6;	% bandwidth [Hz]
+f_c = 1500097656;	% center frequency [Hz]
+K = 4096;        % number of channels
+Ts = K/BW;	% sample period [sec]
+flo = 1100;
+fhi = 1900; 
+
+%%%%%%%%%%% load PSD %%%%%%%%%%%
+size(burst);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%% 
+[K,Nsub] = size(burst); 
+
+%%%%%%%%%%%%%%%% Dedisperse the Burst %%%%%%%%%%%%%%%%
+M = Nsub; 
+delta = 1; 
+dedispersed_burst = dedispersion(burst,DM,BW,f_c,K,Ts); 
+
+figure(4)
+imagesc(dedispersed_burst)
+colorbar
+axis xy 
+xlabel('time, in bins')
+ylabel('frequency, in bins')
+title('Data After Dedispersion')
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+time_high_res = single(0:(Ts*delta):(Ts*Nsub-Ts*delta)); %-Ts*7086));
+% dlmwrite('time_high_res_Nblocks_127.txt', time_high_res, 'delimiter','\t','newline','pc','precision',13);
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Plot time series of the dedispersed pulsar
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+intensity = sum(single(dedispersed_burst),1);  
+%intensity = single(intensity_temp(1:512*127)); 
+%dlmwrite('mat_0_chunk_4_Nblock_127_SK_sigma_7.txt', intensity, 'delimiter','\t','newline','pc','precision',13);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+
+figure(5)
+% subplot(5,1,5)
+plot( time_high_res, filter(ones(32,1),1,intensity - mean(intensity) ))
+grid 
+xlabel('time, in seconds')
+ylabel('PSD')
+title('Periodogram after application of SK')
+% hold on
+
+toc                      
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Modify "sigma" in Line 8, "No" in Line 9, and file name in Line 147. %   
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

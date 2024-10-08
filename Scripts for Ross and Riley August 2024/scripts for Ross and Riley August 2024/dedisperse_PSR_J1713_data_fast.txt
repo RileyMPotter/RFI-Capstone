@@ -1,0 +1,121 @@
+clear all 
+
+tic 
+
+DM = 15.917;
+BW = 800*10^6;	% bandwidth [Hz]
+f_c = 1500097656;	% center frequency [Hz]
+K = 4096;        % number of channels
+Ts = K/BW;	% sample period [sec]
+flo = 1100;
+fhi = 1900; 
+
+%%%%%%%%%%% load PSD %%%%%%%%%%%
+load mat_0_chunk_0_SW_Th_00001; %chunk_0_original; 
+%burst = PSD; % For all other methods but MAD use PSD.'; 
+size(burst)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%% 
+% burst = (abs(burst)); 
+% delta = 64; 
+% figure(3)
+[K,Nsub] = size(burst); 
+
+% M = Nsub; 
+% count = 1;
+% for chan = 1:K 
+%     for ind = 1:1:Nsub/delta 
+%     tf_int(chan,ind) = sum(burst(chan,(ind-1)*delta+1:ind*delta));
+%     end
+% count = count + 1; 
+% end
+
+% imagesc(0:Ts*delta:Ts*(M-1),fhi:-BW*10^(-6)/(K-1):flo,tf_int)
+% imagesc(0:Ts:Ts*(Nsub-1),fhi:-BW*10^(-6)/(K-1):flo,burst)
+% title('Dispersed Data')
+% set(gca,'Ydir','Normal')
+% ylabel('Frequency (MHz)')
+% xlabel('Time (s)')
+% colormap jet
+
+%%%%%%%%%%%%%%%% Dedisperse the Burst %%%%%%%%%%%%%%%%
+M = Nsub; 
+delta = 1; 
+dedispersed_burst = dedispersion(burst,DM,BW,f_c,K,Ts); 
+figure(4) 
+imagesc(0:Ts*delta:Ts*delta*(M-1),fhi:-BW*10^(-6)/(K-1):flo,dedispersed_burst)
+title('Dedispersed Data')
+set(gca,'Ydir','Normal')
+ylabel('Frequency (MHz)')
+xlabel('Time (s)')
+colormap jet 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+
+%%%%%%%%%%%%% Integrate in time, optional %%%%%%%%%%%%
+% count = 1;
+% for chan = 1:K 
+%     for ind = 1:1:Nsub/delta 
+%     tf_int(chan,ind) = sum(dedispersed_burst(chan,(ind-1)*delta+1:ind*delta));
+%     end
+% count = count + 1; 
+% end 
+tf_int = dedispersed_burst; 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% M = 307200;
+% time_high_res = 0:(Ts*delta):(Ts*Nsub-Ts*delta); 
+time_high_res = single(0:(Ts*delta):(Ts*Nsub-Ts*delta)); %-Ts*7086));
+dlmwrite('time_high_res_Nblocks_127.txt', time_high_res, 'delimiter','\t','newline','pc','precision',13);
+% time = 0:Ts:Ts*M-1;
+% time = 0:(Ts*delta):(Ts*Nsub*6-Ts*delta); 
+% dlmwrite('time_chunk_2.txt', time, 'delimiter','\t','newline','pc','precision',13); 
+
+% data2 = filter(1,1,sum(tf_int,1)-mean(sum(tf_int,1))); 
+
+% figure(6)
+% tf_data_int = filter(1,1,sum(tf_int,1) - mean(sum(tf_int,1))); 
+% FTdata = fft(tf_data_int); 
+% df = 1/(Ts*Nsub); 
+% f = df:df:(1/(Ts*delta))
+% plot(f,abs(FTdata)) % - mean(abs(FTdata))) 
+% grid 
+% hold on
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Find the SNR of Single pulse
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%intensity_MAD = filter(1,1,sum(tf_int,1) - mean(sum(tf_int,1))); 
+%dlmwrite('intensity_SW_alpha_0005_part_6.txt', intensity_SW, 'delimiter','\t','newline','pc','precision',13); 
+%dlmwrite('intensity_MAD_Th_6_5_part_6.txt', intensity_MAD, 'delimiter','\t','newline','pc','precision',13);       
+
+intensity_temp = sum(tf_int,1); % - mean(sum(tf_int,1)); 
+intensity = single(intensity_temp); %7087
+%dlmwrite('mat_0_chunk_4_Nblock_127_SW_alpha_e_4.txt', intensity, 'delimiter','\t','newline','pc','precision',13);
+%dlmwrite('intensity_test.txt', intensity_test, 'delimiter','\t','newline','pc','precision',13);  
+%dlmwrite('intensity_RelE_part_6.txt', intensity_RelE, 'delimiter','\t','newline','pc','precision',13);            
+% dlmwrite('intensity_RelE_Th_3_5.txt', intensity, 'delimiter','\t','newline','pc','precision',13);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+
+figure(5)
+% subplot(5,1,5)
+plot( time_high_res, filter(ones(32,1),1,intensity - mean(intensity) ))
+grid 
+xlabel('time, in seconds')
+ylabel('PSD')
+title('Periodogram after application of Shapiro-Wilks')
+
+
+% figure(6)
+% intensity2 = reshape(intensity(1,1:892*72),892,72); 
+% imagesc(intensity2')
+% axis xy
+% xlabel('one period of J1713') 
+% ylabel('individual pulses') 
+
+% folded_pulse = sum(intensity2,2); 
+% folded_pulse = folded_pulse - mean(folded_pulse); 
+% max(folded_pulse)/std(folded_pulse(1:550))
+
+toc
+

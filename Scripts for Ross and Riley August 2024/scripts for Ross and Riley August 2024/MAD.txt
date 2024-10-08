@@ -1,0 +1,116 @@
+clear all 
+
+tic
+
+K = 4096; % the number of channels
+N = 325120; % the number of time samples 
+Nsub = 512; 
+Nblock = 127; %635;   
+
+
+load j1713_mat_0;
+Th = 6; %A typical value of Threshold is between 3 and 7
+No = 0;  
+
+position = No*Nblock; 
+re_mad = re(:,position*Nsub+1:(position+Nblock)*Nsub,1); 
+im_mad = im(:,position*Nsub+1:(position+Nblock)*Nsub,1);
+
+count = 1;
+for ind = 1:1:Nblock
+tf1 = single(re_mad(:,(ind-1)*Nsub+1:ind*Nsub,1))';
+tf2 = single(im_mad(:,(ind-1)*Nsub+1:ind*Nsub,1))';
+
+%PSDprior = tf1.^2 + tf2.^2; 
+
+r = 1; 
+for i = 1:1:K
+  
+    %Generate reference data
+    %Calculate Mean and STD per channel from practical data
+    med1(i) = median(tf1(:,i),1); 
+    med2(i) = median(tf2(:,i),1); 
+    mad1(i) = median(abs(tf1(:,i) - med1(i)),1); 
+    mad2(i) = median(abs(tf2(:,i) - med2(i)),1);  
+    thresh_mad1(i) = Th*1.4826*mad1(i); thresh_mad2(i) = Th*1.4826*mad2(i);
+       
+    for q = 1:Nsub
+        if abs(tf1(q,i) - med1(i)) > thresh_mad1(i) | abs(tf2(q,i) - med2(i)) > thresh_mad2(i)
+            tf1(q,i) = 0; 
+            tf2(q,i) = 0;
+%         else % remove
+%             tf1(q,i) = 1; % remove
+%             tf2(q,i) = 1; % remove
+        end 
+    end    
+    r = r + 1;   
+end
+
+re2(1:K,(ind-1)*Nsub+1:ind*Nsub) = tf1'; 
+im2(1:K,(ind-1)*Nsub+1:ind*Nsub) = tf2'; 
+
+count = count + 1; 
+end 
+
+mask = re2.*im2; 
+
+% figure(1)
+% imagesc(mask) 
+% axis xy 
+% xlabel('time samples, in bins')
+% ylabel('frequency samples, in bins')
+% colorbar
+
+ 
+PSD = single(re2).^2 + single(im2).^2;  
+%save chunk_0_MAD_Th_7 PSD; 
+ 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+DM = 15.917;
+BW = 800*10^6;	% bandwidth [Hz]
+f_c = 1500097656;	% center frequency [Hz]
+K = 4096;        % number of channels
+Ts = K/BW;	% sample period [sec]
+flo = 1100;
+fhi = 1900; 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%% load PSD %%%%%%%%%%%
+%load mat_0_chunk_5_Nblock_127_RelE_Th_3; %chunk_0_original; 
+burst = PSD; % For all other methods but MAD use PSD.'; 
+size(burst) 
+%pause
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%% 
+% delta = 64; 
+[K,Nsub] = size(burst); 
+%%%%%%%%%%%%%%%% Dedisperse the Burst %%%%%%%%%%%%%%%%
+M = Nsub; 
+delta = 1; 
+dedispersed_burst = dedispersion(burst,DM,BW,f_c,K,Ts); 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%tf_int = dedispersed_burst; 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+time_high_res = single(0:(Ts*delta):(Ts*Nsub-Ts*delta)); %-Ts*7086));
+%dlmwrite('time_high_res_Nblocks_127.txt', time_high_res, 'delimiter','\t','newline','pc','precision',13);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Find the SNR of Single pulse
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+intensity_temp = sum(dedispersed_burst,1); % - mean(sum(tf_int,1)); 
+intensity = single(intensity_temp); %7087
+%dlmwrite('mat_0_chunk_4_Nblock_127_MAD_Th_7.txt', intensity, 'delimiter','\t','newline','pc','precision',13);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+
+figure(5)
+% subplot(5,1,5)
+plot( time_high_res, filter(ones(32,1),1,intensity - mean(intensity) ))
+grid 
+hold on
+
+
+toc

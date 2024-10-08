@@ -1,0 +1,76 @@
+clear all 
+tic
+K = 4096; % the number of channels
+N = 325120; % the number of time samples in mat_* file
+Nsub = 512; % the number of subchunks in a chunk of data
+Nblock = 127; % the number of samples per subchunk
+ 
+alpha = 10^(-4); % alpha is set as a power of 10 
+No = 0;
+
+load j1713_mat_0;
+
+%%%%%%%%%%% read a portion of a data chunk %%%%%%%%%%%%
+position = No*Nblock; % starting position 
+re_sw = single(re(:,position*Nsub+1:(position+Nblock)*Nsub,1)); 
+im_sw = single(im(:,position*Nsub+1:(position+Nblock)*Nsub,1));
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%% analyze a set of Nblock arrays each 4096-by-512 %%%%%
+count = 1;
+for ind = 1:1:Nblock
+tf1 = single(re_sw(:,(ind-1)*Nsub+1:ind*Nsub,1))';
+tf2 = single(im_sw(:,(ind-1)*Nsub+1:ind*Nsub,1))';
+%hist2d(tf1(:,600),tf1(:,601)) 
+%pause 
+
+r = 1; 
+%%%%% channel-by-channel analysis %%%%%%
+for i = 1:1:K
+    
+%%%%%%%%%%% Compute Shapiro-Wilk mask %%%%%%%%%%    
+[SWre, pValue, W] = swtest(tf1(:,i),alpha);
+mask_SW_re(ind,i) = 1 - SWre;
+[SWim, pValue, W] = swtest(tf2(:,i),alpha);
+mask_SW_im(ind,i) = 1 - SWim;
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+    r = r + 1;   
+end
+count = count + 1
+end 
+
+
+%%%%%%%%%%%%%%%%%%%%%% Masked PSD using Shapiro-Wilk %%%%%%%%%%%%%%%%%%%%%
+count = 1;
+for ind = 1:1:Nblock 
+    for chan = 1:K 
+data_SW_mask_re((ind-1)*Nsub+1:ind*Nsub,chan) = single(mask_SW_re(ind,chan))*single(mask_SW_im(ind,chan))*re_sw(chan,(ind-1)*Nsub+1:ind*Nsub,1)'; 
+data_SW_mask_im((ind-1)*Nsub+1:ind*Nsub,chan) = single(mask_SW_re(ind,chan))*single(mask_SW_im(ind,chan))*im_sw(chan,(ind-1)*Nsub+1:ind*Nsub,1)';
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% To display the combined mask, uncomment the two lines below
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% data_SW_mask_re((ind-1)*Nsub+1:ind*Nsub,chan) = single(mask_SW_re(ind,chan))*ones(length((ind-1)*Nsub+1:ind*Nsub),1); 
+% data_SW_mask_im((ind-1)*Nsub+1:ind*Nsub,chan) = single(mask_SW_im(ind,chan))*ones(length((ind-1)*Nsub+1:ind*Nsub),1);
+    end     
+count = count + 1
+end 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% mask_SW = (data_SW_mask_re.*data_SW_mask_im)';  
+
+% figure(1)
+% imagesc(mask_SW)
+% colorbar     
+% axis xy     
+% xlabel('time samples, in bins')
+% ylabel('frequency samples, in bins')
+
+%save mask_SW mask_SW; 
+
+%%%%%%%%%%%%%%%%% Form PSD from voltages %%%%%%%%%%%%%%%%%%%%%
+burst = transpose(single(data_SW_mask_re).^2 + single(data_SW_mask_im).^2); 
+save mat_0_chunk_0_SW_Th_00001 burst; 
+
+
+toc

@@ -1,0 +1,218 @@
+clear all 
+tic
+K = 4096; % the number of channels
+N = 325120; % the number of time samples in the mat_* 
+Nsub = 512; % number of time samples used per statistic
+Nblock = 127; % 325120/(512*127) = 5 chunks per mat_*
+%%%%%%%%%%%%
+sigma = 4; % variable (varies from 3 to 7)
+No = 0;  % varies from 0 to 4 (5 chunks in total)
+%%%%%%%%%%%%
+Th = sigma/0.6745; % Original value of Th is 3.5/0.6745. 
+
+
+%load fb8; 
+load j1713_mat_0;
+
+RelE_re_pol0 = zeros(Nblock,K); 
+RelE_im_pol0 = zeros(Nblock,K); 
+  
+position = No*Nblock; 
+re_sre = re(:,position*Nsub+1:(position+Nblock)*Nsub,1); 
+im_sre = im(:,position*Nsub+1:(position+Nblock)*Nsub,1);
+
+count = 1;
+for ind = 1:1:Nblock
+tf1 = single(re_sre(:,(ind-1)*Nsub+1:ind*Nsub,1)).';
+tf2 = single(im_sre(:,(ind-1)*Nsub+1:ind*Nsub,1)).';
+
+% figure(1) 
+% plot(1:512,tf1(:,1830)) 
+
+% figure(2) 
+% imagesc((tf1.^2+tf2.^2)')
+ 
+
+r = 1; 
+for i = 1:1:K
+    
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%% Generate reference data %%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    
+    %Calculate Mean and Variance per channel from practical data
+    mu1(i) = mean(tf1(:,i),1); mu2(i) = mean(tf2(:,i),1);
+    sig1(i) = var(tf1(:,i),1); sig2(i) = var(tf2(:,i),1); 
+     
+    %Form and plot p.m.f. of practical data
+    [num1,pos1] = hist(tf1(:,i),[-128:1:127]); 
+    num1 = num1./sum(num1) + 10^(-10);
+    
+    [num2,pos2] = hist(tf2(:,i),[-128:1:127]); 
+    num2 = num2./sum(num2) + 10^(-10);
+    
+    %Fit a Gaussian p.d.f. with the mean and variance of practical data
+    ref1 = 1/sqrt(2*pi*sig1(i))*exp(-1/(2*sig1(i)).*(pos1 - mu1(i)).^2) + 10^(-10); 
+    ref2 = 1/sqrt(2*pi*sig2(i))*exp(-1/(2*sig2(i)).*(pos2 - mu2(i)).^2) + 10^(-10);
+    
+%Plots pdf of reference data 
+% figure(3)     
+% plot(pos1,num1,'b',pos1,ref1,'r') 
+% axis([-100,100,0,0.05])
+% pause(0.5) 
+
+
+%%%%%%%%%%%%%%% Find normalized spectral entropy %%%%%%%%%%%%%%%%
+KL1(i) = sum(ref1.*log(ref1./num1)); 
+KL2(i) = sum(ref2.*log(ref2./num2)); 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+         
+    r = r + 1;   
+end
+
+
+%Collect data for waterfall plots
+RelE_re_pol0(count,:) = KL1; 
+RelE_im_pol0(count,:) = KL2; 
+
+count = count + 1
+end 
+
+
+% figure(4)       
+% count = 1; 
+% for i = 1:4096
+% hist(RelE_re_pol0(:,i))  
+% count = count + 1
+% pause 
+% end      
+
+
+%%%%%%%%%%%%%%% Compute the mask for KL distance  %%%%%%%%%%%%%
+%%%%%%%%%%%%%%% Apply normalized z-score method   %%%%%%%%%%%%% 
+%%%%%%%%%%%%%%% z-score = robust outlier detector %%%%%%%%%%%%% 
+for chan = 1:K 
+   for ind = 1:Nblock  
+        alpha = median(RelE_re_pol0(:,chan)); 
+        beta = median(abs( RelE_re_pol0(:,chan) - alpha )); 
+        if abs((RelE_re_pol0(ind,chan) - alpha)/beta) > Th 
+            mask_RelE_pol0(ind,chan) = 0; 
+        else 
+            mask_RelE_pol0(ind,chan) = 1; 
+        end
+        
+        gamma = median(RelE_im_pol0(:,chan)); 
+        delta = median(abs( RelE_im_pol0(:,chan) - gamma )); 
+        if abs((RelE_im_pol0(ind,chan) - gamma)/delta) > Th 
+            mask_RelE_pol1(ind,chan) = 0; 
+        else 
+            mask_RelE_pol1(ind,chan) = 1; 
+        end
+    end 
+end
+
+
+%%%%%%%%%%%% SRE mask to display %%%%%%%%%%%%%%%%%%%%%
+% figure(5) 
+% imagesc((mask_RelE_pol0.*mask_RelE_pol1)')
+% colorbar
+% axis xy 
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%% Masked Channalized Voltages using SRE %%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+count = 1;
+for ind = 1:1:Nblock 
+    for chan = 1:K 
+tf_pol0_mask((ind-1)*Nsub+1:ind*Nsub,chan) = mask_RelE_pol0(ind,chan)*mask_RelE_pol1(ind,chan)*re_sre(chan,(ind-1)*Nsub+1:ind*Nsub,1)'; 
+tf_pol1_mask((ind-1)*Nsub+1:ind*Nsub,chan) = mask_RelE_pol0(ind,chan)*mask_RelE_pol1(ind,chan)*im_sre(chan,(ind-1)*Nsub+1:ind*Nsub,1)';
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Comment the two lines above and uncomment 
+% the line below when plotting the mask only
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% tf_pol0_mask((ind-1)*Nsub+1:ind*Nsub,chan) = mask_RelE_pol0(ind,chan)*mask_RelE_pol1(ind,chan)*ones(1,length((ind-1)*Nsub+1:ind*Nsub))'; 
+ 
+    end
+count = count + 1;  
+end 
+
+% figure(6)
+% imagesc(tf_pol0_mask') 
+% axis xy 
+% xlabel('time samples, in bins')
+% ylabel('frequency samples, in bins')
+% colorbar
+% 
+% count 
+% pause 
+
+%%%%%%%%%%%%%%%%%%% Masked PSD using SRE %%%%%%%%%%%%%%%%%%%% 
+% mask = tf_pol0_mask.*tf_pol1_mask; 
+
+% Form spectrogram from masked data 
+burst = ((single(tf_pol0_mask)).^2 + (single(tf_pol1_mask)).^2).'; 
+
+figure(7) 
+imagesc(burst)
+axis xy
+colorbar
+xlabel('time, in bins')
+ylabel('frequency, in bins')
+title('Data Before Dedispersion')
+
+
+DM = 15.917;
+BW = 800*10^6;	% bandwidth [Hz]
+f_c = 1500097656;	% center frequency [Hz]
+K = 4096;        % number of channels
+Ts = K/BW;	% sample period [sec]
+flo = 1100;
+fhi = 1900; 
+
+%%%%%%%%%%% load PSD %%%%%%%%%%%
+size(burst);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%% 
+[K,Nsub] = size(burst); 
+
+%%%%%%%%%%%%%%%% Dedisperse the Burst %%%%%%%%%%%%%%%%
+M = Nsub; 
+delta = 1; 
+dedispersed_burst = dedispersion(burst,DM,BW,f_c,K,Ts); 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+figure(8) 
+imagesc(dedispersed_burst)
+axis xy
+colorbar
+xlabel('time, in bins')
+ylabel('frequency, in bins')
+title('Data After Dedispersion')
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Form and plot Periodogram
+%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+time_high_res = single(0:(Ts*delta):(Ts*Nsub-Ts*delta)); %-Ts*7086));
+%dlmwrite('time_high_res_Nblocks_127.txt', time_high_res,
+%'delimiter','\t','newline','pc','precision',13); 
+
+intensity = sum(single(dedispersed_burst),1);  
+%intensity = single(intensity_temp(1:512*127)); 
+%dlmwrite('mat_0_chunk_0_Nblock_127_RelE_nonsymmetric_sigma_3_5.txt', intensity, 'delimiter','\t','newline','pc','precision',13);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+
+figure(9)
+% subplot(5,1,5)
+plot( time_high_res, filter(ones(32,1),1,intensity - mean(intensity) ))
+grid 
+xlabel('time, in seconds')
+ylabel('PSD')
+title('Periodogram after application of symmetric SRE')
+
+toc
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Modify "chunk" and "sigma" in Lines 8, 9, and 243. %   
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

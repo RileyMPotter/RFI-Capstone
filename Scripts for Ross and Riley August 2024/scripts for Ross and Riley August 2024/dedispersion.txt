@@ -1,0 +1,38 @@
+function [ dedispersed_burst ] = dedispersion(burst,DM,BW,f_c,K,Ts)
+%UNTITLED6 Summary of this function goes here
+%   Detailed explanation goes here
+% burst is 2D array repersents a window of (f,t) plane or what is called  spectrogram
+% Example for some of the parameters:
+% DM= 71; %dispersion measure
+% no is 2D noise array, or it could be just no=burst
+% BW=200e6;	% bandwidth [Hz]
+% f_c=820e6;	% center frequency [Hz]
+% K=2048;        % number of channels
+% Ts=83.92e-6;	% sample period [sec]
+% dedispersed_burst=dedispersion(burst,DM,BW,f_c,K,Ts); 
+
+k_dm = 4.149e-3; % dispersion constant [sec]
+[N,M] = size(burst); 
+f_h = BW/2+f_c; % Highest frequancy
+interval = k_dm*DM*(((f_c-BW/2)/10^9)^(-2)-((f_c+BW/2)/10^9)^(-2)); % burst interval [sec]
+N2 = ceil( interval/Ts );  % burst interval [samples]
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+burst = repmat(burst,1,1+ceil(N2/M)); % it should be M, not N
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%burst = repmat(burst,1,2);
+delta_f = BW/K; % change in frequency wrt change in channel [Hz]
+a_0 = k_dm*DM;
+a_1 = (f_h/10^9)^(-2);
+dedispersed_burst=single(zeros(K,M-N2)); 
+for i = 1:K
+    v = f_h-(i-1)*delta_f;    % find this band's center frequency
+    t_0 = a_0*( (v/10^9)^(-2) - a_1 ); % find time delay for this band
+    n_0 = floor(t_0/Ts); % convert delay to samples
+    dedispersed_burst(i,1:M) = single(burst(i,1+n_0:1+n_0+M-1)); 
+end
+%imagesc(dedispersed_burst)
+%S=sum(dedispersed_burst);
+%plot(s)
+end
