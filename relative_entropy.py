@@ -5,13 +5,13 @@ import riptide
 import scipy.io
 
 # Parameters
-K = 4096  # Number of channels
-N = 65024  # Number of time samples
+K = 4096            # Number of channels
+N = 65024           # Number of time samples
 Nsub = 512
 Nblock = 127
 sigma = 4
-No = 0  # Varies form 0 to 4 (5 chunks in total)
-Th = sigma / 0.6754  # Original value of Th is 3.5 / 0.6745
+No = 0              # Varies form 0 to 4 (5 chunks in total)
+Th = sigma / 0.6754 # Original value of Th is 3.5 / 0.6745
 
 # Load the .mat file
 mat_data = scipy.io.loadmat('j1713_mat_0.mat')
