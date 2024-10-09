@@ -3,6 +3,8 @@ import matplotlib.pyploy as plt
 import time
 import riptide
 import scipy.io
+import sigpyproc
+import presto
 
 # Parameters
 K = 4096            # Number of channels
@@ -22,7 +24,7 @@ position = No * Nblock
 re_chunk = re[:, position * Nsub: (position + Nblock) * Nsub].astype(np.float32)
 im_chunk = im[:, position * Nsub: (position + Nblock) * Nsub].astype(np.float32)
 
-# Calculate Power Specral Density (PSD)
+# Calculate Power Spectral Density (PSD)
 psd_chunk = re_chunk ** 2 + im_chunk ** 2
 
 # Histogram Bins
@@ -68,7 +70,7 @@ for ind in range(Nblock):
     for chan in range(K):
         burst[(ind * Nsub):(ind + 1) * Nsub, chan] = mask_KL[ind, chan] * psd_chunk[chan, (ind * Nsub):(ind + 1) * Nsub]
 
-# Paramteres for dedispersion
+# Parameters for dedispersion
 DM = 15.917
 BW = 800 * 10**6    # Bandwidth [Hz]
 f_c = 150009765     # Center frequency [Hz]
@@ -76,22 +78,23 @@ Ts = K / BW         # Sample period [sec]
 delta = 1
 
 # Dedisperse the burst using Riptide Library
-dedispersed_burst = riptide.dedisperse(burst.T, DM, BW, f_c, K, Ts)
+# Dedisperse using PRESTO
+
 
 # Create time vector
-time_high_res = np.arange(0, Ts * len(dedispersed_burst), Ts * delta, dtype=np.float32)
+#time_high_res = np.arange(0, Ts * len(dedispersed data), Ts * delta, dtype=np.float32)
 
 # Calculate intensity
-intensity = np.sum(dedispersed_burst, axis=0).astype(np.float32)
+# intensity = np.sum(dedispersed_burst, axis=0).astype(np.float32)
 
-# Plot the intesity
-plt.figure()
-plt.plot(time_high_res, np.convolve(intensity - np.mean(intensity), np.ones(32), mode='same'))
-plt.xlabel('Time (s)')
-plt.ylabel('Intesity')
-plt.title('SNR of Signle Pulse')
-plt.grid(True)
-plt.show()
+# Plot the intensity
+# plt.figure()
+# plt.plot(time_high_res, np.convolve(intensity - np.mean(intensity), np.ones(32), mode='same'))
+# plt.xlabel('Time (s)')
+# plt.ylabel('Intesity')
+# plt.title('SNR of Signle Pulse')
+# plt.grid(True)
+# plt.show()
 
 print(f"Execution time: {time.time()} seconds")
 
