@@ -7,7 +7,7 @@ from joblib import Parallel, delayed, parallel_backend, dump, load
 from tqdm import tqdm
 
 # Load data
-data = loadmat("/mnt/d/WVU Classes/RFI-Capstone/Matlab Files/j1713_mat_0.mat")
+data = loadmat("D:/WVU Classes/RFI-Capstone/Matlab Files/j1713_mat_0.mat")
 
 # Constants
 numChannels = 4096

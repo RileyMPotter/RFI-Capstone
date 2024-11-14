@@ -8,27 +8,27 @@ data = loadmat("./Matlab Files/j1713_mat_0.mat")
 
 numChannels = 4096
 timeSamples = 65024
-
 sigma = 4
 theta = sigma / 0.6745
-
 scale = np.arange(0, 2 ** 16)
 v = np.arange(1, 2 ** 16 + 1)
-
 nSub = 512
 nBlock = 127
-
 No = 0
-
 position = No * nBlock
-
 reData = data["re"]
 imData = data["im"]
-
 re_chunk = reData[:, position * nSub: (position + nBlock) * nSub, 0].astype(np.float32)
 im_chunk = imData[:, position * nSub: (position + nBlock) * nSub, 0].astype(np.float32)
 
 psd_chunk = re_chunk * re_chunk + im_chunk * im_chunk
+
+# Unload mat file, clear re_chunk, and psd_chunk
+
+# Parameters used to fit a curve in the histogram of intesnsities per channel
+# scale = 0:1:2^16-1
+# v = 1:2^16
+
 
 count = 1
 KL = np.zeros((nBlock, numChannels))
@@ -52,6 +52,8 @@ for ind in range(nBlock):  # Loop over blocks
         num_ref = num_ref[:len(num)]
         # Relative entropy (KL divergence) per channel per segment
         KL[ind, chan] = np.sum(num_ref * np.log(num_ref / num)) + np.sum(num * np.log(num / num_ref))
+        #      ^  Flip these? 
+
 
         # Optional plotting (if needed, uncomment the next lines)
         # plt.figure(1)
@@ -62,6 +64,8 @@ for ind in range(nBlock):  # Loop over blocks
         # plt.pause(0.5)
 
     count += 1  # Increment count
+    # ^ unused?
+        
     print(str(ind) + "/" + str(range(nBlock)))
 
     mask_KL = np.ones((nBlock, numChannels))  # Initialize mask_KL
@@ -79,6 +83,7 @@ for ind in range(nBlock):  # Loop over blocks
     # Masked KL matrix (optional)
     # masked_KL = KL * mask_KL
 
+    # This needs moved to not be in the loop???
     # Visualize the KL matrix using a waterfall plot
     fig = plt.figure(3)
     ax = fig.add_subplot(111, projection='3d')
@@ -105,7 +110,7 @@ for ind in range(nBlock):  # Loop over blocks
     flo = 1100
     fhi = 1900
 
-
+    # 
     # Dedisperse the burst (assuming dedispersion is a custom function)
     def dedisperse(data, dm, f_lo, f_hi, tsamp):
         """
@@ -147,7 +152,7 @@ for ind in range(nBlock):  # Loop over blocks
     # Calculate the SNR (intensity) of the single pulse
     intensity = np.sum(dedispersed_burst.astype(np.float32), axis=0)
 
-    # Write intensity to a filee
+    # Write intensity to a file
     with open("Intensity_J1713_Mat_0.txt", "w") as f:
         f.write(intensity)
 
