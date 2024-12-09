@@ -1,8 +1,12 @@
 from scipy.io import loadmat
 import pandas as pd
 import numpy as np
+import time
 
 import matplotlib.pyplot as plt
+
+# Get start time for elapsed run time
+start_time = time.time()
 
 data = loadmat("./Matlab Files/j1713_mat_0.mat")
 
@@ -16,6 +20,18 @@ nSub = 512
 nBlock = 127
 No = 0
 position = No * nBlock
+
+# Define burst parameters
+DM = 15.917
+BW = 800 * 10 ** 6  # bandwidth [Hz]
+f_c = 1500097656  # center frequency [Hz]
+K = 4096  # number of channels
+Ts = K / BW  # sample period [sec]
+flo = 1100
+fhi = 1900
+
+count = 1
+    
 reData = data["re"]
 imData = data["im"]
 re_chunk = reData[:, position * nSub: (position + nBlock) * nSub, 0].astype(np.float32)
@@ -52,19 +68,7 @@ for ind in range(nBlock):  # Loop over blocks
         num_ref = num_ref[:len(num)]
         # Relative entropy (KL divergence) per channel per segment
         KL[ind, chan] = np.sum(num_ref * np.log(num_ref / num)) + np.sum(num * np.log(num / num_ref))
-        #      ^  Flip these? 
-
-
-        # Optional plotting (if needed, uncomment the next lines)
-        # plt.figure(1)
-        # plt.plot(pos[:-1], num, 'b', label='Observed')
-        # plt.plot(pos[:-1], num_ref, 'r', label='Reference')
-        # plt.axis([0, 5000, 0, 0.01])
-        # plt.legend()
-        # plt.pause(0.5)
-
-    count += 1  # Increment count
-    # ^ unused?
+        #      ^  Flip these? index out of bounds if you switch it
         
     print(str(ind) + "/" + str(range(nBlock)))
 
@@ -83,17 +87,7 @@ for ind in range(nBlock):  # Loop over blocks
     # Masked KL matrix (optional)
     # masked_KL = KL * mask_KL
 
-    # This needs moved to not be in the loop???
-    # Visualize the KL matrix using a waterfall plot
-    fig = plt.figure(3)
-    ax = fig.add_subplot(111, projection='3d')
-    X, Y = np.meshgrid(np.arange(nBlock), np.arange(numChannels))
-    ax.plot_surface(X, Y, KL.T, cmap='viridis')
-    plt.colorbar(ax.plot_surface(X, Y, KL.T, cmap='viridis'))
-    plt.xlabel('Blocks grouped by 512 time samples')
-    plt.ylabel('Channels, in bins')
-    plt.title('Relative Entropy, pol0')
-    plt.show()
+
 
     # Apply mask to PSD data
     burst = np.zeros((nBlock * nSub, numChannels))
@@ -101,16 +95,6 @@ for ind in range(nBlock):  # Loop over blocks
         for chan in range(numChannels):
             burst[ind * nSub:(ind + 1) * nSub, chan] = mask_KL[ind, chan] * psd_chunk[chan, ind * nSub:(ind + 1) * nSub]
 
-    # Define burst parameters
-    DM = 15.917
-    BW = 800 * 10 ** 6  # bandwidth [Hz]
-    f_c = 1500097656  # center frequency [Hz]
-    K = 4096  # number of channels
-    Ts = K / BW  # sample period [sec]
-    flo = 1100
-    fhi = 1900
-
-    # 
     # Dedisperse the burst (assuming dedispersion is a custom function)
     def dedisperse(data, dm, f_lo, f_hi, tsamp):
         """
@@ -154,7 +138,46 @@ for ind in range(nBlock):  # Loop over blocks
 
     # Write intensity to a file
     with open("Intensity_J1713_Mat_0.txt", "w") as f:
-        f.write(intensity)
+        f.write(np.array2string(intensity))
+        # ^ Prints first 3 values, followed by ..., then last 3 values
 
     # Print shape of burst array
-    print(burst.shape)
+    # print(burst.shape)
+    
+    print(f"nBlocks Completed: {count}")
+    count += 1  # Increment count
+    
+    curr_run_time = time.time()
+    curr_run_time_seconds = curr_run_time - start_time
+    curr_run_time_minutes = curr_run_time_seconds / 60
+    print(f"Current run time: {curr_run_time_minutes:.2f} minutes ({curr_run_time_seconds:.2f} seconds).")
+
+# This needs moved to not be in the loop???
+# Visualize the KL matrix using a waterfall plot
+fig = plt.figure(3)
+ax = fig.add_subplot(111, projection='3d')
+X, Y = np.meshgrid(np.arange(nBlock), np.arange(numChannels))
+ax.plot_surface(X, Y, KL.T, cmap='viridis')
+plt.colorbar(ax.plot_surface(X, Y, KL.T, cmap='viridis'))
+plt.xlabel('Blocks grouped by 512 time samples')
+plt.ylabel('Channels, in bins')
+plt.title('Relative Entropy, pol0')
+plt.show()
+plt.savefig()
+
+# Optional plotting (if needed, uncomment the next lines)
+# plt.figure(1)
+# plt.plot(pos[:-1], num, 'b', label='Observed')
+# plt.plot(pos[:-1], num_ref, 'r', label='Reference')
+# plt.axis([0, 5000, 0, 0.01])
+# plt.legend()
+# plt.pause(0.5)
+
+# Get end time, and print elapsed time
+end_time = time.time()
+elapsed_time_seconds = end_time - start_time
+elapsed_time_minutes = elapsed_time_seconds / 60
+avg_time_per_nBlock_minutes = elapsed_time_minutes / 127
+avg_time_per_nBlock_seconds = elapsed_time_seconds / 127
+print(f"Script completed in {elapsed_time_minutes:.2f} minutes.")
+print(f"Average time to complete a nBlock: {avg_time_per_nBlock_minutes:.2f} minutes ({avg_time_per_nBlock_seconds:.2f} seconds)")

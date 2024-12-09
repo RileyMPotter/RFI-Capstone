@@ -14,18 +14,13 @@ def relative_entropy():
 
     numChannels = 4096
     timeSamples = 65024
-
     sigma = 4
     theta = sigma / 0.6745
-
     scale = np.arange(0, 2 ** 16)
     v = np.arange(1, 2 ** 16 + 1)
-
     nSub = 512
     nBlock = 127
-
     No = 0
-
     position = No * nBlock
 
     reData = data["re"]
@@ -35,7 +30,10 @@ def relative_entropy():
     im_chunk = imData[:, position * nSub: (position + nBlock) * nSub, 0].astype(np.float32)
 
     psd_chunk = re_chunk * re_chunk + im_chunk * im_chunk
-
+    
+    #unload mat file, re_chunk, im_chunk
+    
+    
     count = 1
     KL = np.zeros((nBlock, numChannels))
 

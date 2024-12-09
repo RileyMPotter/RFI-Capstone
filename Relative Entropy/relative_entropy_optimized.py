@@ -6,12 +6,9 @@ import matplotlib.pyplot as plt
 from joblib import Parallel, delayed, parallel_backend, dump, load
 from tqdm import tqdm
 
-# Load data
-data = loadmat("D:/WVU Classes/RFI-Capstone/Matlab Files/j1713_mat_0.mat")
-
 # Constants
 numChannels = 4096
-timeSamples = 65024
+timeSamples = 65024 # Change value to change how many data indecies are processed
 sigma = 4
 theta = sigma / 0.6745
 scale = np.arange(0, 2 ** 16, dtype=np.float32)
@@ -19,6 +16,10 @@ v = np.arange(1, 2 ** 16 + 1, dtype=np.float32)
 nSub = 512
 nBlock = 127
 No = 0
+
+# Load data
+data = loadmat("D:/WVU Classes/RFI-Capstone/Matlab Files/j1713_mat_0.mat")
+
 position = No * nBlock
 
 reData = data["re"]
@@ -31,6 +32,8 @@ psd_chunk = re_chunk * re_chunk + im_chunk * im_chunk
 # Memory-map large data to a file
 dump(psd_chunk, 'psd_chunk_memmap.pkl')
 psd_chunk_memmap = load('psd_chunk_memmap.pkl', mmap_mode='r')
+
+# Unload mat file, clear re_chunk, and psd_chunk
 
 # Vectorized histogram calculation and KL divergence computation
 chunk_size = 1024  # Process in smaller chunks to avoid memory overload
