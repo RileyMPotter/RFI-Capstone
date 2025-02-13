@@ -2,7 +2,7 @@ from scipy.io import loadmat
 import pandas as pd
 import numpy as np
 import time
-
+import gc
 import matplotlib.pyplot as plt
 
 # Get start time for elapsed run time
@@ -40,6 +40,16 @@ im_chunk = imData[:, position * nSub: (position + nBlock) * nSub, 0].astype(np.f
 psd_chunk = re_chunk * re_chunk + im_chunk * im_chunk
 
 # Unload mat file, clear re_chunk, and psd_chunk
+data.clear()
+del data
+gc.collect()
+
+del reData
+del imData
+del re_chunk
+del im_chunk
+gc.collect()
+print("File, re chunk, and im chunk unloaded to save memory.")
 
 # Parameters used to fit a curve in the histogram of intesnsities per channel
 # scale = 0:1:2^16-1
@@ -136,10 +146,17 @@ for ind in range(nBlock):  # Loop over blocks
     # Calculate the SNR (intensity) of the single pulse
     intensity = np.sum(dedispersed_burst.astype(np.float32), axis=0)
 
-    # Write intensity to a file
+    # Previously only prints first 3 values, followed by ..., then last 3 values
+    # Adjust NumPy's print options to display the entire array
+    np.set_printoptions(threshold=np.inf)
+
+    # Write all elements of the array to the file
     with open("Intensity_J1713_Mat_0.txt", "w") as f:
         f.write(np.array2string(intensity))
-        # ^ Prints first 3 values, followed by ..., then last 3 values
+
+    # Reset NumPy's print options to default
+    np.set_printoptions(threshold=1000)  # Reset to a reasonable threshold
+     
 
     # Print shape of burst array
     # print(burst.shape)
